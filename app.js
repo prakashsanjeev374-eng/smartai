@@ -24,12 +24,14 @@ async function loadBuf(url, label){
 }
 async function loadModels(){
   try{
-    ort.env.logLevel='error'; ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/';
-    ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(3, navigator.hardwareConcurrency||2) : 1); ort.env.wasm.proxy = true; /* inference in a worker keeps video/UI smooth */
+    ort.env.logLevel='error'; ort.env.wasm.wasmPaths = new URL('ort/', location.href).href;
+    ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(3, navigator.hardwareConcurrency||2) : 1); ort.env.wasm.proxy = true;
     const opt = {executionProviders:['wasm'], graphOptimizationLevel:'all'};
-    yunet = await ort.InferenceSession.create(await loadBuf('https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx','face detector'), opt);
-    yolo  = await ort.InferenceSession.create(await loadBuf('https://huggingface.co/deepghs/yolos/resolve/main/yolov8n/model.onnx','object detector'), opt);
-    sface = await ort.InferenceSession.create(await loadBuf('https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx','face recognizer (38 MB, first time only)'), opt);
+    yunet = await ort.InferenceSession.create(await loadBuf('models/yunet.onnx','face detector'), opt);
+    yolo  = await ort.InferenceSession.create(await loadBuf('models/yolov8n.onnx','object detector'), opt);
+    const p0=await loadBuf('models/sface.part0','face recognizer 1/2'), p1=await loadBuf('models/sface.part1','face recognizer 2/2');
+    const sb=new Uint8Array(p0.length+p1.length); sb.set(p0,0); sb.set(p1,p0.length);
+    sface = await ort.InferenceSession.create(sb, opt);
     await loadFaces();
     modelsReady = true;
     $('pwr-mode').textContent='[BROWSER AI + FACE ID: ON]'; $('pwr-mode').style.color='#00ffa3';
@@ -53,7 +55,7 @@ function toBGR255(d){ const n=640*640, f=new Float32Array(3*n); for(let i=0,j=0;
 // ---------- YOLO ----------
 function iou(a,b){ const x1=Math.max(a[0],b[0]),y1=Math.max(a[1],b[1]),x2=Math.min(a[2],b[2]),y2=Math.min(a[3],b[3]); const i=Math.max(0,x2-x1)*Math.max(0,y2-y1); const u=(a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-i; return u>0?i/u:0; }
 function nms(items, thr){ items.sort((a,b)=>b.score-a.score); const keep=[]; for(const it of items){ let ok=true; for(const k of keep){ if(k.cls!==undefined && it.cls!==undefined && k.cls!==it.cls) continue; if(iou(k.box,it.box)>thr){ok=false;break;} } if(ok) keep.push(it);} return keep; }
-const YS=(new URLSearchParams(location.search).get('hi')?320:256); const yc=document.createElement('canvas'); yc.width=yc.height=YS; const ycx=yc.getContext('2d',{willReadFrequently:true});
+const YS=(new URLSearchParams(location.search).get('hi')?320:192); const yc=document.createElement('canvas'); yc.width=yc.height=YS; const ycx=yc.getContext('2d',{willReadFrequently:true});
 async function runYolo(src, w, h){
   const s=Math.min(YS/w,YS/h); ycx.fillStyle='#727272'; ycx.fillRect(0,0,YS,YS); ycx.drawImage(src,0,0,w,h,0,0,Math.round(w*s),Math.round(h*s));
   const d=ycx.getImageData(0,0,YS,YS).data, n=YS*YS, f=new Float32Array(3*n);
@@ -111,7 +113,7 @@ let known = []; // {name, emb, thumb, builtin}
 const LS_KEY='sv_faces_v1', LS_DEL='sv_deleted_builtin_v1';
 async function loadFaces(){
   const del = JSON.parse(localStorage.getItem(LS_DEL)||'[]');
-  try{ const d = await (await fetch('default_faces.json')).json(); for(const k in d) if(!del.includes(k)) known.push({name:k, emb:normalize(Float32Array.from(d[k])), thumb:null, builtin:true}); }catch(e){}
+  try{ const d = await (await fetch('models/default_faces.json')).json(); for(const k in d) if(!del.includes(k)) known.push({name:k, emb:normalize(Float32Array.from(d[k])), thumb:null, builtin:true}); }catch(e){}
   try{ for(const u of JSON.parse(localStorage.getItem(LS_KEY)||'[]')) known.push({name:u.name, emb:normalize(Float32Array.from(u.emb)), thumb:u.thumb, builtin:false}); }catch(e){}
   renderRefs();
 }
@@ -196,9 +198,9 @@ async function aiLoop(){
     try{ if(video.readyState>=2 && video.videoWidth){
       const w=video.videoWidth, h=video.videoHeight; if(cap.width!==w){cap.width=w;cap.height=h;}
       capx.drawImage(video,0,0,w,h); frameNo++;
-      if(frameNo%2===0){ const dets=await runYolo(cap,w,h); updateTracks(dets); }
+      if(frameNo%3===0){ const dets=await runYolo(cap,w,h); updateTracks(dets); }
       let fresh=false;
-      if(frameNo%4===1){ const L=letterbox(cap,w,h); lastFaces=await runYunet(L.data,L.s); fresh=true; }
+      if(frameNo%6===1){ const L=letterbox(cap,w,h); lastFaces=await runYunet(L.data,L.s); fresh=true; }
       await matchFaces(lastFaces, fresh);
       postProcess(w,h); aiCount++;
     }}catch(e){ console.error(e); }
