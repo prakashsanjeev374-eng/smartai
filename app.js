@@ -12,7 +12,8 @@ const TEMPLATE = [[38.2946,51.6963],[73.5318,51.5014],[56.0252,71.7366],[41.5493
 let AC = null, voiceOn = true, lastSpoke = 0;
 function beep(f,d,vol){ try{ AC = AC || new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value=f; g.gain.value=vol||0.2; o.start(); o.stop(AC.currentTime+(d||0.1)); }catch(e){} }
 function speak(t, force){ if(!voiceOn) return; const n=Date.now(); if(!force && n-lastSpoke<3000) return; lastSpoke=n; try{ if(window.NativeTTS){ NativeTTS.speak(t); return; } const u=new SpeechSynthesisUtterance(t); u.rate=1.1; u.pitch=0.9; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){} }
-function toggleVoice(){ voiceOn=!voiceOn; $('voiceBtn').textContent='🔊 VOICE: '+(voiceOn?'ON':'OFF'); if(!voiceOn) try{speechSynthesis.cancel()}catch(e){} }
+function IC(n){return '<svg class="ic"><use href="#i-'+n+'"/></svg>';}
+function toggleVoice(){ voiceOn=!voiceOn; $('voiceBtn').innerHTML=IC(voiceOn?'vol':'mute')+' VOICE: '+(voiceOn?'ON':'OFF'); if(!voiceOn) try{speechSynthesis.cancel()}catch(e){} }
 
 // ---------- models ----------
 let yolo=null, yunet=null, sface=null, modelsReady=false;
@@ -32,8 +33,8 @@ async function loadModels(){
     await loadFaces();
     modelsReady = true;
     $('pwr-mode').textContent='[BROWSER AI + FACE ID: ON]'; $('pwr-mode').style.color='#00ffa3';
-    $('camMsgT').innerHTML = 'AI ready ✅<br>Tap <b>START CAMERA</b> and allow camera permission';
-    const b = document.createElement('button'); b.className='upb'; b.style.cssText='max-width:260px;background:#00ffa3;color:#000'; b.textContent='▶ START CAMERA'; b.onclick=startCam; $('camMsg').appendChild(b); b.id='bigStart';
+    $('camMsgT').innerHTML = 'AI ready<br>Tap <b>START CAMERA</b> and allow camera permission';
+    const b = document.createElement('button'); b.className='upb'; b.style.cssText='max-width:260px;background:#00ffa3;color:#000'; b.innerHTML=IC('play')+' START CAMERA'; b.onclick=startCam; $('camMsg').appendChild(b); b.id='bigStart';
   }catch(e){ $('camMsgT').textContent='Error loading AI: '+e.message; $('pwr-mode').textContent='[AI ERROR]'; $('pwr-mode').style.color='#ff3333'; console.error(e); }
 }
 
@@ -174,9 +175,9 @@ async function startCam(){
     if(stream) stream.getTracks().forEach(t=>t.stop());
     stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:640},height:{ideal:480}},audio:false});
     video.srcObject=stream; await video.play();
-    $('camMsg').style.display='none'; $('camBtn').textContent='⏹ CAMERA ON'; AC&&AC.resume(); beep(880,0.08,0.2);
+    $('camMsg').style.display='none'; $('camBtn').innerHTML=IC('cam')+' CAMERA ON'; AC&&AC.resume(); beep(880,0.08,0.2);
     if(!running){ running=true; loop(); }
-  }catch(e){ $('camMsg').style.display='flex'; $('camMsgT').innerHTML='Camera blocked ❌<br>Allow camera permission in the browser (lock icon near the address bar) and tap START again.<br><small>'+e.message+'</small>'; }
+  }catch(e){ $('camMsg').style.display='flex'; $('camMsgT').innerHTML='Camera blocked<br>Allow camera permission in the browser (lock icon near the address bar) and tap START again.<br><small>'+e.message+'</small>'; }
 }
 function flipCam(){ facing = facing==='user'?'environment':'user'; if(running) startCam(); }
 
@@ -276,3 +277,18 @@ function stab(n,el){ document.querySelectorAll('.tab').forEach(t=>t.classList.re
 function doSearch(){ const q=$('searchInput').value.toLowerCase(), el=$('searchRes'); const f=Object.values(objectDetails).filter(o=>o.class.toLowerCase().includes(q)||o.category.toLowerCase().includes(q)||o.dominant_color.toLowerCase().includes(q)); el.innerHTML=f.length?f.reverse().map(o=>`<div class="sr ${o.is_criminal?'crim':''}" onclick="showObj('${o.track_id}')"><div class="sn">${o.class} #${o.track_id}</div><div class="sd">${o.category} · ${o.dominant_color} · ${o.direction} · ${o.confidence}%</div></div>`).join(''):'<p style="color:#555">No results.</p>'; }
 function showObj(id){ const o=objectDetails[id]; if(!o) return; beep(500,0.05,0.15); $('mbody').innerHTML=[['Object',o.class],['Category',o.category],['Confidence',o.confidence+'%'],['Color',`<span class="color-dot" style="background:${o.color_hex}"></span>${o.dominant_color}`],['Direction',o.direction],['Face match',o.is_criminal?o.face_match:'—'],['Seen',o.time]].map(r=>`<div class="rw"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join(''); $('modal').classList.add('show'); }
 window.addEventListener('load', loadModels);
+
+// ---------- fullscreen video ----------
+(function(){
+  const c=document.querySelector('.center');
+  function openFS(){ if(c.classList.contains('fs')) return; c.classList.add('fs'); document.body.classList.add('fs-on'); try{ const f=c.requestFullscreen||c.webkitRequestFullscreen; if(f){ const r=f.call(c); if(r&&r.catch) r.catch(()=>{}); } }catch(e){} }
+  window.closeFS=function(){ if(!c.classList.contains('fs')) return false; c.classList.remove('fs'); document.body.classList.remove('fs-on'); try{ if(document.fullscreenElement||document.webkitFullscreenElement){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); } }catch(e){} return true; };
+  c.addEventListener('click',function(e){
+    if(e.target.closest('#fsBtn')){ if(c.classList.contains('fs')) closeFS(); else openFS(); return; }
+    if(e.target.closest('#camMsg button')) return;
+    if(c.classList.contains('fs')){ closeFS(); return; }
+    if(running) openFS();
+  });
+  document.addEventListener('fullscreenchange',function(){ if(!document.fullscreenElement) closeFS(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeFS(); });
+})();
