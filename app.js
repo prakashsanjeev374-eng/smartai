@@ -292,3 +292,23 @@ window.addEventListener('load', loadModels);
   document.addEventListener('fullscreenchange',function(){ if(!document.fullscreenElement) closeFS(); });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeFS(); });
 })();
+const DEVS=['HARSHI','JEEVA','SANJEEV_PKT']; let devI=0;
+function nextDev(){ devI=(devI+1)%DEVS.length; const b=document.getElementById('devname'); const n=b.cloneNode(false); n.textContent=DEVS[devI]; b.replaceWith(n); }
+// ---------- intro video ----------
+(function(){
+  const box=document.getElementById('intro'), v=document.getElementById('introVid'), snd=document.getElementById('introSnd');
+  let done=false;
+  function reveal(){ if(done) return; done=true; box.classList.add('out'); setTimeout(function(){ box.remove(); try{URL.revokeObjectURL(v.src)}catch(x){} },600); }
+  function finish(){ if(done||waiting) return; try{v.pause();}catch(x){} snd.style.display='none'; if(modelsReady){ reveal(); return; } waiting=true; box.classList.add('wait'); const t0=Date.now(); const t=setInterval(function(){ const er=(document.getElementById('pwr-mode')||{}).textContent||''; if(modelsReady||er.indexOf('ERROR')>=0||Date.now()-t0>90000){ clearInterval(t); reveal(); } },150); }
+  let waiting=false;
+  window.skipIntro=function(e){ if(e&&e.stopPropagation) e.stopPropagation(); finish(); };
+  box.addEventListener('click',function(){ if(v.muted){ v.muted=false; snd.style.display='none'; try{v.play();}catch(x){} } else finish(); });
+  v.addEventListener('ended',function(){ finish(); });
+  v.addEventListener('error',function(){ finish(); });
+  fetch('intro.mp4').then(function(r){ if(!r.ok) throw 0; return r.blob(); }).then(function(b){
+    v.src=URL.createObjectURL(b); v.muted=false;
+    const pr=v.play();
+    if(pr&&pr.catch) pr.catch(function(){ v.muted=true; v.play().then(function(){ snd.style.display='block'; }).catch(finish); });
+  }).catch(function(){ finish(); });
+  setTimeout(function(){ if(!done && !v.src) finish(); },6000);
+})();
