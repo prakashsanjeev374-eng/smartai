@@ -52,7 +52,7 @@ function toBGR255(d){ const n=640*640, f=new Float32Array(3*n); for(let i=0,j=0;
 // ---------- YOLO ----------
 function iou(a,b){ const x1=Math.max(a[0],b[0]),y1=Math.max(a[1],b[1]),x2=Math.min(a[2],b[2]),y2=Math.min(a[3],b[3]); const i=Math.max(0,x2-x1)*Math.max(0,y2-y1); const u=(a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-i; return u>0?i/u:0; }
 function nms(items, thr){ items.sort((a,b)=>b.score-a.score); const keep=[]; for(const it of items){ let ok=true; for(const k of keep){ if(k.cls!==undefined && it.cls!==undefined && k.cls!==it.cls) continue; if(iou(k.box,it.box)>thr){ok=false;break;} } if(ok) keep.push(it);} return keep; }
-const YS=416; const yc=document.createElement('canvas'); yc.width=yc.height=YS; const ycx=yc.getContext('2d',{willReadFrequently:true});
+const YS=320; const yc=document.createElement('canvas'); yc.width=yc.height=YS; const ycx=yc.getContext('2d',{willReadFrequently:true});
 async function runYolo(src, w, h){
   const s=Math.min(YS/w,YS/h); ycx.fillStyle='#727272'; ycx.fillRect(0,0,YS,YS); ycx.drawImage(src,0,0,w,h,0,0,Math.round(w*s),Math.round(h*s));
   const d=ycx.getImageData(0,0,YS,YS).data, n=YS*YS, f=new Float32Array(3*n);
@@ -160,7 +160,7 @@ function updateTracks(dets){
     else { const t={id:nextId++,cls:d.cls,box:d.box,score:d.score,miss:0,matched:true,trail:[],name:COCO[d.cls].toUpperCase(),raw:COCO[d.cls],cat:cat(COCO[d.cls]),color:'Gray',crim:false,face:'N/A',age:0,isNew:true}; tracks.push(t); }
   }
   for(const t of tracks) if(!t.matched) t.miss++;
-  tracks=tracks.filter(t=>t.miss<10);
+  tracks=tracks.filter(t=>t.miss<6);
 }
 
 // ---------- camera + loop ----------
@@ -180,28 +180,41 @@ async function startCam(){
 }
 function flipCam(){ facing = facing==='user'?'environment':'user'; if(running) startCam(); }
 
-async function loop(){
+let aiCount=0, aiTime=performance.now(), renderCount=0, renderTime=performance.now(), vw=0, vh=0;
+function renderLoop(){
   if(!running) return;
-  try{ if(video.readyState>=2 && video.videoWidth){
-    const w=video.videoWidth, h=video.videoHeight; if(cap.width!==w){cap.width=w;cap.height=h;view.width=w;view.height=h;}
-    capx.drawImage(video,0,0,w,h);
-    frameNo++;
-    const dets=await runYolo(cap,w,h); updateTracks(dets);
-    if(frameNo%2===1){ const L=letterbox(cap,w,h); lastFaces=await runYunet(L.data,L.s); }
-    await matchFaces(lastFaces, frameNo%2===1);
-    postProcess(w,h); draw(w,h);
-    fcount++; const n=performance.now(); if(n-ftime>=1000){ $('hfps').textContent=fcount; fcount=0; ftime=n; }
-  }}catch(e){ console.error(e); }
-  requestAnimationFrame(loop);
+  if(video.readyState>=2 && video.videoWidth){
+    const w=video.videoWidth, h=video.videoHeight; if(view.width!==w){view.width=w;view.height=h;}
+    vw=w; vh=h; draw(w,h);
+    renderCount++; const n=performance.now(); if(n-renderTime>=1000){ $('hfps').textContent=renderCount+' | AI '+aiCount; renderCount=0; aiCount=0; renderTime=n; }
+  }
+  requestAnimationFrame(renderLoop);
 }
+async function aiLoop(){
+  while(running){
+    try{ if(video.readyState>=2 && video.videoWidth){
+      const w=video.videoWidth, h=video.videoHeight; if(cap.width!==w){cap.width=w;cap.height=h;}
+      capx.drawImage(video,0,0,w,h); frameNo++;
+      const dets=await runYolo(cap,w,h); updateTracks(dets);
+      let fresh=false;
+      if(frameNo%3===1){ const L=letterbox(cap,w,h); lastFaces=await runYunet(L.data,L.s); fresh=true; }
+      await matchFaces(lastFaces, fresh);
+      postProcess(w,h); aiCount++;
+    }}catch(e){ console.error(e); }
+    await new Promise(r=>setTimeout(r,0));
+  }
+}
+function loop(){ renderLoop(); aiLoop(); }
 async function matchFaces(faces, fresh){
-  if(!fresh||!known.length) return;
+  if(!fresh||!known.length) return; let done=0;
   for(const f of faces){
+    if(done>=2) break;
     const cx=(f.box[0]+f.box[2])/2, cy=(f.box[1]+f.box[3])/2; let tr=null, ba=1e12;
     for(const t of tracks){ if(t.cls!==0||t.miss) continue; if(cx>=t.box[0]&&cx<=t.box[2]&&cy>=t.box[1]&&cy<=t.box[3]){ const a=(t.box[2]-t.box[0])*(t.box[3]-t.box[1]); if(a<ba){ba=a;tr=t;} } }
     if(!tr) continue;
+    if(tr.lastEmb && frameNo-tr.lastEmb < (tr.crim?30:6)) continue;
+    tr.lastEmb=frameNo; done++;
     const e=await embed(cap,f.lm); let bs=0,bn=null; for(const k of known){ const s=dot(k.emb,e); if(s>bs){bs=s;bn=k.name;} }
-    tr.faceBox=f.box; tr.faceAt=frameNo;
     if(bs>=MATCH_MIN){ tr.crimNew = !tr.crim || tr.name!==bn; tr.crim=true; tr.name=bn; tr.face=Math.min(99.9,bs*100+30).toFixed(1)+'%'; tr.rawScore=bs; }
   }
 }
@@ -242,7 +255,7 @@ function renderEviMini(){ $('efeed2').innerHTML=evidence.slice(0,12).map(e=>`<di
 function renderEviFull(){ $('eviGrid').innerHTML=evidence.map(e=>`<div class="ec ${e.crim?'crim':''}"><img src="${e.frame}"><div class="en">${e.id} · ${e.class}</div><div class="ei">Confidence: ${e.conf}%<br>Color: ${e.color}<br>${e.crim?'FACE MATCH: '+e.face+'<br>':''}${e.time}<br><a style="color:#00d2ff" download="${e.id}-crop.jpg" href="${e.crop}">⬇ download crop</a> · <a style="color:#00d2ff" download="${e.id}-frame.jpg" href="${e.frame}">⬇ frame</a></div></div>`).join('')||'<p style="color:#555">No evidence captured yet.</p>'; }
 
 function draw(w,h){
-  vx.drawImage(cap,0,0,w,h); const lw=Math.max(2,w/320);
+  vx.drawImage(video,0,0,w,h); const lw=Math.max(2,w/320);
   for(const t of tracks){ if(t.miss) continue; const [x1,y1,x2,y2]=t.box;
     const col=t.crim?'#ff0000':t.cat==='PERSON'?'#00ffb4':t.cat==='VEHICLE'?'#00b4ff':t.cat==='ANIMAL'?'#ffb400':'#b4b4b4';
     vx.strokeStyle=col; vx.fillStyle=col; vx.lineWidth=lw;
