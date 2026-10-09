@@ -1,5 +1,5 @@
 'use strict';
-// ===== SMARTVISION AI - browser edition (all AI runs on YOUR device, camera = your device) =====
+// ===== INSIGHTX - browser edition (all AI runs on YOUR device, camera = your device) =====
 const $ = id => document.getElementById(id);
 const VEHICLES = new Set(['car','motorcycle','bus','truck']);
 const ANIMALS = new Set(['dog','cat','horse','sheep','cow','elephant','bear','zebra','giraffe','bird']);
@@ -268,7 +268,7 @@ function draw(w,h){
     if(t.crim){ vx.fillStyle='#f00'; vx.font='bold '+(fs*1.2)+'px sans-serif'; vx.fillText(t.name+' LOCKED',x1,y2+fs*1.3); }
     else if(t.cat==='PERSON'||t.cat==='VEHICLE'){ vx.fillText(t.color,x1,y2+fs); }
   }
-  vx.font='bold '+Math.max(11,w/55)+'px sans-serif'; vx.fillStyle=tracks.some(t=>t.crim&&!t.miss)?'#f00':'#00ffc8'; vx.fillText(`SMARTVISION AI | ${known.length} IDs | FPS:${$('hfps').textContent}`,8,h-8);
+  vx.font='bold '+Math.max(11,w/55)+'px sans-serif'; vx.fillStyle=tracks.some(t=>t.crim&&!t.miss)?'#f00':'#00ffc8'; vx.fillText(`INSIGHTX | ${known.length} IDs | FPS:${$('hfps').textContent}`,8,h-8);
 }
 
 // ---------- UI helpers ----------
