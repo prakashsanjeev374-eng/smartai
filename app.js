@@ -228,8 +228,7 @@ function postProcess(w,h){
     t.age++;
     const obj={track_id:String(t.id),class:t.name,category:t.cat,confidence:+(t.score*100).toFixed(1),dominant_color:t.color,color_hex:COLOR_HEX[t.color]||'#888',direction:t.dir,is_criminal:t.crim,face_match:t.face,time:new Date().toLocaleTimeString()};
     objectDetails[obj.track_id]=obj;
-    if(t.isNew){ t.isNew=false; newDetections.unshift(obj); if(newDetections.length>60) newDetections.pop(); if(!t.crimNew) addDetCard(obj); if(t.cat==='PERSON'&&!t.crim) beep(880,0.08,0.2);
-      if(t.score>0.5 && now-lastSave>3000){ lastSave=now; saveEvidence(t,obj); } }
+    if(t.isNew){ t.isNew=false; newDetections.unshift(obj); if(newDetections.length>60) newDetections.pop(); if(!t.crimNew) addDetCard(obj); if(t.cat==='PERSON'&&!t.crim) beep(880,0.08,0.2); }
     if(t.crimNew){ t.crimNew=false; objectDetails[obj.track_id]=obj; addDetCard(obj); beep(1500,0.2,0.8); { const nm=t.name.charAt(0)+t.name.slice(1).toLowerCase(); speak(nm+' detected. Target locked: '+nm+'.',true); }; saveEvidence(t,obj,true); }
   }
   $('sys-dot').classList.toggle('alert',anyCrim);
