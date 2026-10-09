@@ -292,8 +292,8 @@ window.addEventListener('load', loadModels);
   document.addEventListener('fullscreenchange',function(){ if(!document.fullscreenElement) closeFS(); });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeFS(); });
 })();
-const DEVS=['HARSHI','JEEVA','SANJEEV_PKT']; let devI=0;
-function nextDev(){ devI=(devI+1)%DEVS.length; const b=document.getElementById('devname'); const n=b.cloneNode(false); n.textContent=DEVS[devI]; b.replaceWith(n); }
+const DEVS=['HARSHI','JEEVA','LAVANYA','SANJEEV_PKT']; let devI=-1, devT=null;
+function nextDev(){ const c=document.getElementById('devcred'); if(!c.classList.contains('show')) devI=-1; devI=(devI+1)%DEVS.length; const b=document.getElementById('devname'); const n=b.cloneNode(false); n.textContent=DEVS[devI]; b.replaceWith(n); c.classList.add('show'); clearTimeout(devT); devT=setTimeout(function(){ c.classList.remove('show'); },6000); }
 // ---------- intro video ----------
 (function(){
   const box=document.getElementById('intro'), v=document.getElementById('introVid'), snd=document.getElementById('introSnd');
@@ -305,10 +305,10 @@ function nextDev(){ devI=(devI+1)%DEVS.length; const b=document.getElementById('
   box.addEventListener('click',function(){ if(v.muted){ v.muted=false; snd.style.display='none'; try{v.play();}catch(x){} } else finish(); });
   v.addEventListener('ended',function(){ finish(); });
   v.addEventListener('error',function(){ finish(); });
-  fetch('intro.mp4').then(function(r){ if(!r.ok) throw 0; return r.blob(); }).then(function(b){
-    v.src=URL.createObjectURL(b); v.muted=false;
-    const pr=v.play();
-    if(pr&&pr.catch) pr.catch(function(){ v.muted=true; v.play().then(function(){ snd.style.display='block'; }).catch(finish); });
-  }).catch(function(){ finish(); });
+  function go(){ v.defaultPlaybackRate=1.5; v.playbackRate=1.5; try{ v.preservesPitch=true; v.webkitPreservesPitch=true; v.mozPreservesPitch=true; }catch(x){} v.muted=false;
+    const pr=v.play(); if(pr&&pr.catch) pr.catch(function(){ v.muted=true; v.playbackRate=1.5; v.play().then(function(){ snd.style.display='block'; }).catch(finish); }); }
+  v.addEventListener('loadedmetadata',function(){ v.playbackRate=1.5; });
+  if(v.getAttribute('src')) go();
+  else fetch('intro.mp4').then(function(r){ if(!r.ok) throw 0; return r.blob(); }).then(function(b){ v.src=URL.createObjectURL(b); go(); }).catch(function(){ finish(); });
   setTimeout(function(){ if(!done && !v.src) finish(); },6000);
 })();
