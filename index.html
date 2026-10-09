@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>INSIGHTX</title>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>INSIGHTX</title><link rel="icon" type="image/png" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2f6fe0"><meta name="apple-mobile-web-app-title" content="INSIGHTX">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--tx:#1a2a4a;--mut:#5c6d8c;--wh:rgba(255,255,255,.55);--edge:rgba(255,255,255,.85);--r:30px;--sh:0 18px 40px rgba(40,70,120,.20),0 3px 8px rgba(40,70,120,.10)}
@@ -171,7 +171,12 @@ body.fs-on{overflow:hidden}
 #intro.wait:after{content:'';position:absolute;left:20%;right:20%;bottom:calc(36px + env(safe-area-inset-bottom));height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#8fd0ff,#b57bff,transparent);background-size:200% 100%;animation:introbar 1.4s linear infinite;box-shadow:0 0 14px rgba(150,120,255,.8)}
 @keyframes introbar{from{background-position:200% 0}to{background-position:-200% 0}}
 #intro.wait #introSkip{display:none}
-</style></head><body><div id="intro"><video id="introVid" playsinline preload="auto"></video><button id="introSkip" onclick="skipIntro(event)">SKIP</button><div id="introSnd">Tap for sound</div></div>
+.brandrow{display:flex;align-items:center;gap:10px}
+#devBtn{width:28px;height:28px;border-radius:10px;border:1px solid rgba(255,255,255,.7);background:linear-gradient(160deg,#1b1040,#0c0722);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(40,20,110,.35);transition:transform .15s}
+#devBtn:active{transform:scale(.9)}
+#devBtn svg.ic{width:16px;height:16px;stroke:#c08cff;filter:drop-shadow(0 0 4px #a45bff)}
+.cred{display:none;margin-top:3px}.cred.show{display:block;animation:cin .3s ease}
+</style></head><body><div id="intro"><video id="introVid" playsinline preload="auto"></video><button id="introSkip" onclick="skipIntro(event)">SKIP</button><div id="introSnd">Tap for sound</div><script>(function(){var v=document.getElementById('introVid');if(location.hostname!=='appassets.local'){v.preload='auto';v.src='intro.mp4';v.load();}})();</script></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></symbol>
 <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2.5h8.5A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/></symbol>
@@ -186,6 +191,7 @@ body.fs-on{overflow:hidden}
 <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 21 19.5H3z"/><path d="M12 10v4.5"/><path d="M12 17.2v.1"/></symbol>
 <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></symbol>
 <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12"/><path d="m18 6-12 12"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3"/><path d="M3 19.5a6 5 0 0 1 12 0z"/><path d="M16 5.8a3 3 0 0 1 0 5.4"/><path d="M17.5 14.2a5.5 4.5 0 0 1 3.5 5.3h-3"/></symbol>
 </defs></svg>
 <div class="sidebar">
   <div class="logo"><svg class="ic"><use href="#i-cam"/></svg></div>
@@ -196,7 +202,7 @@ body.fs-on{overflow:hidden}
 </div>
 <div class="main-area">
 <div class="topbar">
-  <div class="brand"><h1>INSIGHTX</h1><div class="cred" id="devcred" onclick="nextDev()">Developer team &middot; <b id="devname">HARSHI</b></div></div>
+  <div class="brand"><div class="brandrow"><h1>INSIGHTX</h1><button id="devBtn" onclick="nextDev()" aria-label="Developer team"><svg class="ic"><use href="#i-users"/></svg></button></div><div class="cred" id="devcred">Developer team &middot; <b id="devname">HARSHI</b></div></div>
   <div class="st">
     <span id="pwr-mode" style="font-weight:bold">[LOADING AI...]</span>
     <span><span class="dot" id="sys-dot"></span>AI ONLINE</span>
@@ -276,5 +282,5 @@ body.fs-on{overflow:hidden}
 
 <script src="coi-serviceworker.js"></script>
 <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.wasm.min.js"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body></html>
