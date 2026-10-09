@@ -11,7 +11,7 @@ const TEMPLATE = [[38.2946,51.6963],[73.5318,51.5014],[56.0252,71.7366],[41.5493
 // ---------- audio ----------
 let AC = null, voiceOn = true, lastSpoke = 0;
 function beep(f,d,vol){ try{ AC = AC || new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.connect(g); g.connect(AC.destination); o.frequency.value=f; g.gain.value=vol||0.2; o.start(); o.stop(AC.currentTime+(d||0.1)); }catch(e){} }
-function speak(t, force){ if(!voiceOn) return; const n=Date.now(); if(!force && n-lastSpoke<3000) return; lastSpoke=n; try{ const u=new SpeechSynthesisUtterance(t); u.rate=1.1; u.pitch=0.9; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){} }
+function speak(t, force){ if(!voiceOn) return; const n=Date.now(); if(!force && n-lastSpoke<3000) return; lastSpoke=n; try{ if(window.NativeTTS){ NativeTTS.speak(t); return; } const u=new SpeechSynthesisUtterance(t); u.rate=1.1; u.pitch=0.9; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){} }
 function toggleVoice(){ voiceOn=!voiceOn; $('voiceBtn').textContent='🔊 VOICE: '+(voiceOn?'ON':'OFF'); if(!voiceOn) try{speechSynthesis.cancel()}catch(e){} }
 
 // ---------- models ----------
@@ -24,7 +24,7 @@ async function loadBuf(url, label){
 async function loadModels(){
   try{
     ort.env.logLevel='error'; ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/';
-    ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency||2) : 1);
+    ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(3, navigator.hardwareConcurrency||2) : 1); ort.env.wasm.proxy = true; /* inference in a worker keeps video/UI smooth */
     const opt = {executionProviders:['wasm'], graphOptimizationLevel:'all'};
     yunet = await ort.InferenceSession.create(await loadBuf('https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx','face detector'), opt);
     yolo  = await ort.InferenceSession.create(await loadBuf('https://huggingface.co/deepghs/yolos/resolve/main/yolov8n/model.onnx','object detector'), opt);
@@ -52,7 +52,7 @@ function toBGR255(d){ const n=640*640, f=new Float32Array(3*n); for(let i=0,j=0;
 // ---------- YOLO ----------
 function iou(a,b){ const x1=Math.max(a[0],b[0]),y1=Math.max(a[1],b[1]),x2=Math.min(a[2],b[2]),y2=Math.min(a[3],b[3]); const i=Math.max(0,x2-x1)*Math.max(0,y2-y1); const u=(a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-i; return u>0?i/u:0; }
 function nms(items, thr){ items.sort((a,b)=>b.score-a.score); const keep=[]; for(const it of items){ let ok=true; for(const k of keep){ if(k.cls!==undefined && it.cls!==undefined && k.cls!==it.cls) continue; if(iou(k.box,it.box)>thr){ok=false;break;} } if(ok) keep.push(it);} return keep; }
-const YS=320; const yc=document.createElement('canvas'); yc.width=yc.height=YS; const ycx=yc.getContext('2d',{willReadFrequently:true});
+const YS=(new URLSearchParams(location.search).get('hi')?320:256); const yc=document.createElement('canvas'); yc.width=yc.height=YS; const ycx=yc.getContext('2d',{willReadFrequently:true});
 async function runYolo(src, w, h){
   const s=Math.min(YS/w,YS/h); ycx.fillStyle='#727272'; ycx.fillRect(0,0,YS,YS); ycx.drawImage(src,0,0,w,h,0,0,Math.round(w*s),Math.round(h*s));
   const d=ycx.getImageData(0,0,YS,YS).data, n=YS*YS, f=new Float32Array(3*n);
@@ -195,9 +195,9 @@ async function aiLoop(){
     try{ if(video.readyState>=2 && video.videoWidth){
       const w=video.videoWidth, h=video.videoHeight; if(cap.width!==w){cap.width=w;cap.height=h;}
       capx.drawImage(video,0,0,w,h); frameNo++;
-      const dets=await runYolo(cap,w,h); updateTracks(dets);
+      if(frameNo%2===0){ const dets=await runYolo(cap,w,h); updateTracks(dets); }
       let fresh=false;
-      if(frameNo%3===1){ const L=letterbox(cap,w,h); lastFaces=await runYunet(L.data,L.s); fresh=true; }
+      if(frameNo%4===1){ const L=letterbox(cap,w,h); lastFaces=await runYunet(L.data,L.s); fresh=true; }
       await matchFaces(lastFaces, fresh);
       postProcess(w,h); aiCount++;
     }}catch(e){ console.error(e); }
@@ -230,7 +230,7 @@ function postProcess(w,h){
     objectDetails[obj.track_id]=obj;
     if(t.isNew){ t.isNew=false; newDetections.unshift(obj); if(newDetections.length>60) newDetections.pop(); if(!t.crimNew) addDetCard(obj); if(t.cat==='PERSON'&&!t.crim) beep(880,0.08,0.2);
       if(t.score>0.5 && now-lastSave>3000){ lastSave=now; saveEvidence(t,obj); } }
-    if(t.crimNew){ t.crimNew=false; objectDetails[obj.track_id]=obj; addDetCard(obj); beep(1500,0.2,0.8); speak('Target locked! '+t.name+' identified!',true); saveEvidence(t,obj,true); }
+    if(t.crimNew){ t.crimNew=false; objectDetails[obj.track_id]=obj; addDetCard(obj); beep(1500,0.2,0.8); { const nm=t.name.charAt(0)+t.name.slice(1).toLowerCase(); speak(nm+' detected. Target locked: '+nm+'.',true); }; saveEvidence(t,obj,true); }
   }
   $('sys-dot').classList.toggle('alert',anyCrim);
   const act=tracks.filter(t=>!t.miss), tot=act.length;
